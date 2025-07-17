@@ -1,7 +1,4 @@
-# This workflow will build a .NET project
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
-
-name: .NET
+name: Build, Test & Deploy to IIS
 
 on:
   push:
@@ -10,19 +7,34 @@ on:
     branches: [ "master" ]
 
 jobs:
-  build:
-
-    runs-on: ubuntu-latest
+  build-and-deploy:
+    runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup .NET
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+
+    - name: 🛠️ Setup .NET 9 SDK
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 9.0.x
-    - name: Restore dependencies
+
+    - name: 🔄 Restore dependencies
       run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Test
+
+    - name: 🔨 Build project
+      run: dotnet build --configuration Release --no-restore
+
+    - name: 🧪 Run tests
       run: dotnet test --no-build --verbosity normal
+
+    - name: 📦 Publish project
+      run: dotnet publish --configuration Release --output ./publish
+
+    - name: 🚀 Deploy to IIS using Web Deploy
+      run: |
+        "C:\Program Files\IIS\Microsoft Web Deploy V3\msdeploy.exe" -verb:sync ^
+          -source:contentPath="publish" ^
+          -dest:contentPath="${{ secrets.IIS_SITE_NAME }}",computerName="https://${{ secrets.IIS_SERVER }}:8172/msdeploy.axd?site=${{ secrets.IIS_SITE_NAME }}",userName="${{ secrets.IIS_USERNAME }}",password="${{ secrets.IIS_PASSWORD }}",authType="Basic" ^
+          -allowUntrusted ^
+          -enableRule:AppOffline
